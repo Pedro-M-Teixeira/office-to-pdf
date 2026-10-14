@@ -18,7 +18,7 @@ Tudo corre no computador de quem usa — nada vai para a nuvem.
 
 ## Para quem vai usar
 
-1. Descarregar `Office_para_PDF.exe` da página **Releases** do repositório.
+1. Descarregar `Office_para_PDF.exe` da página **Releases** do repositório. Link aqui: https://github.com/Pedro-M-Teixeira/office-to-pdf/releases/latest 
 2. Duplo clique. Se o Windows avisar (o ficheiro não está assinado): **Mais informações → Executar mesmo assim**.
 3. **Escolher pasta…**, marcar os tipos pretendidos e **Converter para PDF**.
 
