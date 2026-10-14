@@ -1,0 +1,73 @@
+name: Gerar .exe
+
+# Gera Office_para_PDF.exe num computador Windows do GitHub.
+#  - Ao publicar uma Release: o .exe é anexado automaticamente a essa Release.
+#  - Manualmente (Actions -> Gerar .exe -> Run workflow): o .exe fica como "artefacto".
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Gerar executável
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name Office_para_PDF
+          --hidden-import pythoncom
+          --hidden-import pywintypes
+          --hidden-import win32com
+          --hidden-import win32com.client
+          --hidden-import win32timezone
+          office_para_pdf.py
+
+      - name: Autoteste do executável
+        shell: pwsh
+        run: |
+          $saida = Join-Path $PWD "autoteste.txt"
+          $p = Start-Process -FilePath "dist\Office_para_PDF.exe" -ArgumentList "--autoteste", "`"$saida`"" -Wait -PassThru
+          Get-Content $saida
+          if ($p.ExitCode -ne 0) { throw "O autoteste do executável falhou." }
+
+      # Teste informativo (não bloqueia a publicação): converte amostras reais com o LibreOffice.
+      # Os runners do GitHub não têm Microsoft Office, por isso o caminho Word/Excel/PowerPoint
+      # não pode ser testado aqui.
+      - name: Teste de conversão real (LibreOffice)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          choco install libreoffice-fresh -y --no-progress
+          pip install python-docx openpyxl python-pptx
+          python tests/criar_amostras.py amostras
+          $args = "`"$PWD\amostras`" --subpastas --motor=libreoffice"
+          Start-Process -FilePath "dist\Office_para_PDF.exe" -ArgumentList $args -Wait
+          $pdfs = @(Get-ChildItem amostras\PDF -Recurse -Filter *.pdf)
+          $pdfs | ForEach-Object { $_.FullName }
+          if ($pdfs.Count -ne 5) { throw "Esperados 5 PDF, gerados $($pdfs.Count)." }
+
+      - name: Guardar como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: Office_para_PDF
+          path: dist/Office_para_PDF.exe
+
+      - name: Anexar à Release
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/Office_para_PDF.exe --clobber
